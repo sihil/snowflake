@@ -6,6 +6,7 @@ from enum import Enum
 
 import joystick
 import plotter
+from drawing import draw_snowflake
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,8 @@ current_y = 0
 plotter.pen_up()
 current_pen_state = PenState.UP
 
+current_drawing = []
+sleep_count = 0
 
 # Your main program can continue to run concurrently with the joystick reading thread
 try:
@@ -80,6 +83,15 @@ try:
         joystick_y = joystick_state["ABS_Y"]
         joystick_z = joystick_state["ABS_Z"]
 
+        se_button = joystick_state.get("BTN_BASE5", 0)
+
+        if current_pen_state == PenState.UP and se_button == 1 and (current_x != 0 or current_y != 0):
+            # reset back to centre
+            plotter.move_to(0, 0, 8000)
+            current_x = 0
+            current_y = 0
+            continue
+
         # Calculate distance from neutral/rest position
         distance = calculate_distance(joystick_y, joystick_x, max_distance=512)
         component_x, component_y = joystick_y - 512, joystick_x - 512
@@ -88,14 +100,24 @@ try:
         if joystick_z > 140 and current_pen_state == PenState.UP:
             plotter.pen_down()
             current_pen_state = PenState.DOWN
+            current_drawing.append((current_x, current_y))
         elif joystick_z <= 128 and current_pen_state == PenState.DOWN:
             plotter.pen_up()
             current_pen_state = PenState.UP
+            draw_snowflake(plotter=plotter, drawing=current_drawing, return_to=(current_x, current_y))
+            current_drawing = []
 
         # Apply a dead zone (e.g., 20 units) around the neutral position
         if distance < 20:
             feed_rate = 0
+            if sleep_count < 50:
+                sleep_count += 1
+            elif current_pen_state != PenState.DOWN and sleep_count == 50:
+                plotter.sleep()
+                logger.info("Plotter sleeping")
+                sleep_count += 1
         else:
+            sleep_count = 0
             # Map joystick values to speed
             feed_rate = map_distance_to_feedrate(distance, max_distance, max_feedrate)
 
@@ -106,12 +128,19 @@ try:
             target_x = current_x + x_portion_of_distance
             target_y = current_y + y_portion_of_distance
 
-            # Move the head to the target location if it's safe to do so
-            if abs(target_x) <= 148 and abs(target_y) <= 210:
-                plotter.move_to(x=target_x, y=target_y, feed_rate=feed_rate)
+            # Calculate distance from origin
+            distance_from_origin = math.sqrt(target_x ** 2 + target_y ** 2)
 
-            current_x = target_x
-            current_y = target_y
+            # Move the head to the target location if it's safe to do so
+            if distance_from_origin <= 148:
+                plotter.move_to(x=target_x, y=target_y, feed_rate=feed_rate)
+                # update where we think we are
+                current_x = target_x
+                current_y = target_y
+                # add the current location to the drawing if we're drawing
+                if current_pen_state == PenState.DOWN:
+                    current_drawing.append((current_x, current_y))
+
         time.sleep(0.1)  # Add some main program logic or just sleep to keep the program running
 
 except KeyboardInterrupt:

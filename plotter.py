@@ -46,3 +46,6 @@ class Plotter:
     def pen_up(self):
         # Raise the pen
         drawcore_serial.command(self.serial_port, "G1G90Z0.5F5000\r")
+
+    def sleep(self):
+        drawcore_serial.command(self.serial_port, "$SLP\r")
