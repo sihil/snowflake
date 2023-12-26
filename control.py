@@ -53,21 +53,12 @@ max_feedrate = 2000  # note that this is mm/min
 max_distance = 512  # this is the maximum distance from the center of the joystick
 
 
-class PenState(Enum):
-    UP = 0
-    DOWN = 1
-
-
 plotter = plotter.Plotter()
 plotter.initialise()
 plotter.home()
 plotter.centre()
 plotter.set_origin()
-current_x = 0
-current_y = 0
-
 plotter.pen_up()
-current_pen_state = PenState.UP
 
 current_drawing = []
 sleep_count = 0
@@ -85,11 +76,9 @@ try:
 
         se_button = joystick_state.get("BTN_BASE5", 0)
 
-        if current_pen_state == PenState.UP and se_button == 1 and (current_x != 0 or current_y != 0):
-            # reset back to centre
+        if plotter.is_pen_up() and se_button == 1 and not plotter.is_at_origin():
+            # reset back to origin
             plotter.move_to(0, 0, 8000)
-            current_x = 0
-            current_y = 0
             continue
 
         # Calculate distance from neutral/rest position
@@ -97,14 +86,12 @@ try:
         component_x, component_y = joystick_y - 512, joystick_x - 512
 
         # Set the pen state
-        if joystick_z > 140 and current_pen_state == PenState.UP:
+        if joystick_z > 140 and plotter.is_pen_up():
             plotter.pen_down()
-            current_pen_state = PenState.DOWN
-            current_drawing.append((current_x, current_y))
-        elif joystick_z <= 128 and current_pen_state == PenState.DOWN:
+            current_drawing.append((plotter.x, plotter.y))
+        elif joystick_z <= 128 and plotter.is_pen_down():
             plotter.pen_up()
-            current_pen_state = PenState.UP
-            draw_snowflake(plotter=plotter, drawing=current_drawing, return_to=(current_x, current_y))
+            draw_snowflake(plotter=plotter, drawing=current_drawing, return_to=(plotter.x, plotter.y))
             current_drawing = []
 
         # Apply a dead zone (e.g., 20 units) around the neutral position
@@ -112,7 +99,7 @@ try:
             feed_rate = 0
             if sleep_count < 50:
                 sleep_count += 1
-            elif current_pen_state != PenState.DOWN and sleep_count == 50:
+            elif plotter.is_pen_up() and sleep_count == 50:
                 plotter.sleep()
                 logger.info("Plotter sleeping")
                 sleep_count += 1
@@ -125,8 +112,8 @@ try:
             x_portion_of_distance, y_portion_of_distance = calculate_components(joystick_y, joystick_x, feed_rate * (1/600))
 
             # Calculate where we want the head to move to in a tenth of a second (or a 600th of a minute)
-            target_x = current_x + x_portion_of_distance
-            target_y = current_y + y_portion_of_distance
+            target_x = plotter.x + x_portion_of_distance
+            target_y = plotter.y + y_portion_of_distance
 
             # Calculate distance from origin
             distance_from_origin = math.sqrt(target_x ** 2 + target_y ** 2)
@@ -134,12 +121,9 @@ try:
             # Move the head to the target location if it's safe to do so
             if distance_from_origin <= 148:
                 plotter.move_to(x=target_x, y=target_y, feed_rate=feed_rate)
-                # update where we think we are
-                current_x = target_x
-                current_y = target_y
                 # add the current location to the drawing if we're drawing
-                if current_pen_state == PenState.DOWN:
-                    current_drawing.append((current_x, current_y))
+                if plotter.is_pen_down():
+                    current_drawing.append((plotter.x, plotter.y))
 
         time.sleep(0.1)  # Add some main program logic or just sleep to keep the program running
 
