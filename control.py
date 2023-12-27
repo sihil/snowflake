@@ -2,7 +2,6 @@ import logging
 import math
 import threading
 import time
-from enum import Enum
 
 import joystick
 import plotter
@@ -81,7 +80,8 @@ try:
             plotter.move_to(0, 0, 8000)
             continue
 
-        # Calculate distance from neutral/rest position
+        # Calculate distance from neutral/rest position; note that we map the joysticks x-axis to the
+        # y-axis of the plotter and vice versa
         distance = calculate_distance(joystick_y, joystick_x, max_distance=512)
         component_x, component_y = joystick_y - 512, joystick_x - 512
 
@@ -91,7 +91,11 @@ try:
             current_drawing.append((plotter.x, plotter.y))
         elif joystick_z <= 128 and plotter.is_pen_down():
             plotter.pen_up()
-            draw_snowflake(plotter=plotter, drawing=current_drawing, return_to=(plotter.x, plotter.y))
+            draw_snowflake(plotter=plotter,
+                           drawing=current_drawing,
+                           order=6,
+                           mirror=True,
+                           return_to=(plotter.x, plotter.y))
             current_drawing = []
 
         # Apply a dead zone (e.g., 20 units) around the neutral position

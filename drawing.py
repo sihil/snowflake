@@ -3,7 +3,7 @@ import math
 from plotter import Plotter
 
 
-def draw_snowflake(plotter: Plotter, drawing: list[tuple[float, float]], return_to: tuple[float, float]):
+def draw_snowflake(plotter: Plotter, drawing: list[tuple[float, float]], order: int, mirror: bool, return_to: tuple[float, float]):
     if drawing is None or len(drawing) < 2:
         return
     # we've already drawn the first one, so we can skip it
@@ -11,22 +11,24 @@ def draw_snowflake(plotter: Plotter, drawing: list[tuple[float, float]], return_
     # and then draw five more and their reflections
 
     # what are the angles...
-    # 0, 60, 120, 180, 240, 300
+    angle_delta: float = 360 / order
+    angles = [angle_delta * i for i in range(order)]
     # do we guess from the drawing which is closest or always start with 0?
 
     # we need to rotate the drawing by 60 degrees
-    for angle in [60, 120, 180, 240, 300]:
+    for angle in angles[1:]:
         rotated_drawing = [rotate((0, 0), (x, y), math.radians(angle))
                            for x, y in drawing]
         draw(plotter, rotated_drawing)
 
     # now draw the mirror image
-    # mirror on the x-axis
-    mirrored_drawing = [(-x, y) for x, y in drawing]
-    for angle in [0, 60, 120, 180, 240, 300]:
-        rotated_drawing = [rotate((0, 0), (x, y), math.radians(angle))
-                           for x, y in mirrored_drawing]
-        draw(plotter, rotated_drawing)
+    if mirror:
+        # mirror on the x-axis
+        mirrored_drawing = [(-x, y) for x, y in drawing]
+        for angle in angles:
+            rotated_drawing = [rotate((0, 0), (x, y), math.radians(angle))
+                               for x, y in mirrored_drawing]
+            draw(plotter, rotated_drawing)
 
     # now return to the start
     plotter.move_to(*return_to, feed_rate=8000)
