@@ -52,7 +52,6 @@ class Plotter:
 
     def move_to(self, x, y, feed_rate):
         # Move to the given location at the given feed rate
-        logger.info("Moving to ({}, {}) at {} mm/min".format(x, y, feed_rate))
         drawcore_serial.command(self.serial_port, f"G1G90X{x:.3f}Y{y:.3f}F{feed_rate}\r")
         self.x = x
         self.y = y

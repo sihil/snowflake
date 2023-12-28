@@ -54,31 +54,65 @@ max_distance = 512  # this is the maximum distance from the center of the joysti
 
 plotter = plotter.Plotter()
 plotter.initialise()
-plotter.home()
-plotter.centre()
-plotter.set_origin()
-plotter.pen_up()
+
+
+def home_and_origin():
+    logger.info("Homing and setting origin")
+    plotter.home()
+    plotter.centre()
+    plotter.set_origin()
+
 
 current_drawing = []
 sleep_count = 0
 
-# Your main program can continue to run concurrently with the joystick reading thread
+order = 6
+mirror = True
+
+
+def log_state():
+    mirror_state = "with mirroring" if mirror else "without mirroring"
+    logger.info(f"Order {order} {mirror_state}")
+
+
+def change_order(delta):
+    global order
+    order += delta
+    if order < 1:
+        order = 1
+    log_state()
+
+
+def change_mirror(new_mirror: bool):
+    global mirror
+    if mirror != new_mirror:
+        mirror = new_mirror
+        log_state()
+
+
+def move_to_origin():
+    logger.info("Moving to origin")
+    if plotter.is_pen_up() and not plotter.is_at_origin():
+        plotter.move_to(0, 0, 8000)
+
+
+# register all the behaviour modifications
+joystick.register_button_callback(button="ABS_HAT0Y", value=-1, callback=lambda: change_order(1))
+joystick.register_button_callback(button="ABS_HAT0Y", value=1, callback=lambda: change_order(-1))
+joystick.register_button_callback(button="ABS_HAT0X", value=-1, callback=lambda: change_mirror(False))
+joystick.register_button_callback(button="ABS_HAT0X", value=1, callback=lambda: change_mirror(True))
+
+joystick.register_button_callback(button="BTN_BASE5", value=1, callback=lambda: move_to_origin())
+joystick.register_button_callback(button="BTN_BASE6", value=1, callback=lambda: home_and_origin())
+
 try:
     while True:
-        # Your main program logic goes here
         joystick_state = joystick.latest_state()
 
         # Read joystick input
         joystick_x = joystick_state["ABS_X"]
         joystick_y = joystick_state["ABS_Y"]
         joystick_z = joystick_state["ABS_Z"]
-
-        se_button = joystick_state.get("BTN_BASE5", 0)
-
-        if plotter.is_pen_up() and se_button == 1 and not plotter.is_at_origin():
-            # reset back to origin
-            plotter.move_to(0, 0, 8000)
-            continue
 
         # Calculate distance from neutral/rest position; note that we map the joysticks x-axis to the
         # y-axis of the plotter and vice versa
@@ -93,8 +127,8 @@ try:
             plotter.pen_up()
             draw_snowflake(plotter=plotter,
                            drawing=current_drawing,
-                           order=6,
-                           mirror=True,
+                           order=order,
+                           mirror=mirror,
                            return_to=(plotter.x, plotter.y))
             current_drawing = []
 

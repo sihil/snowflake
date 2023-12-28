@@ -210,10 +210,10 @@ def command(port_name, cmd):
                                             '    Response: {0}'.format(response.strip())))
                     else:
                         error_msg = 'DrawCore Serial Timeout after command: {0}'.format(cmd)
-                    logger.error(error_msg)
+                    raise ValueError(error_msg)
                 log_file.write(f"{timestamp()} < {repr(response)}\n")
             except (serial.SerialException, IOError, RuntimeError, OSError) as err:
-                if cmd.strip().lower() not in ["rb"]: # Ignore error on reboot (RB) command
+                if cmd.strip().lower() not in ["rb"]:  # Ignore error on reboot (RB) command
                     logger.error('Failed after command: {0}'.format(cmd))
                     logger.info("Error context:", exc_info=err)
 
