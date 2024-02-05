@@ -161,61 +161,55 @@ def timestamp():
 def query(port_name, cmd):
     if port_name is not None and cmd is not None:
         response = ''
-        with open("debug-log.gcode", "a") as log_file:
-            try:
-                port_name.write(cmd.encode('ascii'))
-                log_file.write(f"{timestamp()} q> {repr(cmd)}\n")
-                response = port_name.readline().decode('ascii')
+        try:
+            port_name.write(cmd.encode('ascii'))
+            response = port_name.readline().decode('ascii')
+            n_retry_count = 0
+            while len(response) == 0 and n_retry_count < 20:
+                # get new response to replace null response if necessary
+                response = port_name.readline()
+                n_retry_count += 1
+            if cmd.split(",")[0].strip().lower() not in ["v", "i", "a", "mr", "pi", "qm"]:
+                # Most queries return an "OK" after the data requested.
+                # We skip this for those few queries that do not return an extra line.
+                unused_response = port_name.readline()  # read in extra blank/OK line
                 n_retry_count = 0
-                while len(response) == 0 and n_retry_count < 20:
+                while len(unused_response) == 0 and n_retry_count < 20:
                     # get new response to replace null response if necessary
-                    response = port_name.readline()
+                    unused_response = port_name.readline()
                     n_retry_count += 1
-                if cmd.split(",")[0].strip().lower() not in ["v", "i", "a", "mr", "pi", "qm"]:
-                    # Most queries return an "OK" after the data requested.
-                    # We skip this for those few queries that do not return an extra line.
-                    unused_response = port_name.readline()  # read in extra blank/OK line
-                    n_retry_count = 0
-                    while len(unused_response) == 0 and n_retry_count < 20:
-                        # get new response to replace null response if necessary
-                        unused_response = port_name.readline()
-                        n_retry_count += 1
-            except (serial.SerialException, IOError, RuntimeError, OSError) as err:
-                logger.error("Error reading serial data")
-                logger.info("Error context:", exc_info=err)
-            log_file.write(f"{timestamp()} < {repr(response)}\n")
+        except (serial.SerialException, IOError, RuntimeError, OSError) as err:
+            logger.error("Error reading serial data")
+            logger.info("Error context:", exc_info=err)
         return response
 
 
 def command(port_name, cmd):
     if port_name is not None and cmd is not None:
-        with open("debug-log.gcode", "a") as log_file:
-            try:
-                port_name.write(cmd.encode('ascii'))
-                log_file.write(f"{timestamp()} c> {repr(cmd)}\n")
+        try:
+            port_name.write(cmd.encode('ascii'))
+            response = port_name.readline().decode('ascii')
+            n_retry_count = 0
+            while len(response) == 0 and n_retry_count < 20:
+                # get new response to replace null response if necessary
                 response = port_name.readline().decode('ascii')
-                n_retry_count = 0
-                while len(response) == 0 and n_retry_count < 20:
-                    # get new response to replace null response if necessary
-                    response = port_name.readline().decode('ascii')
-                    n_retry_count += 1
-                if response.strip().startswith("ok"):
-                    # Debug option: indicate which command:
-                    # inkex.errormsg( 'OK after command: ' + cmd )
-                    pass
+                n_retry_count += 1
+            if response.strip().startswith("ok"):
+                # Debug option: indicate which command:
+                # inkex.errormsg( 'OK after command: ' + cmd )
+                pass
+            else:
+                if response:
+                    error_msg = '\n'.join(('Unexpected response from DrawCore.',
+                                        '    Command: {0}'.format(cmd.strip()),
+                                        '    Response: {0}'.format(response.strip())))
                 else:
-                    if response:
-                        error_msg = '\n'.join(('Unexpected response from DrawCore.',
-                                            '    Command: {0}'.format(cmd.strip()),
-                                            '    Response: {0}'.format(response.strip())))
-                    else:
-                        error_msg = 'DrawCore Serial Timeout after command: {0}'.format(cmd)
-                    raise ValueError(error_msg)
-                log_file.write(f"{timestamp()} < {repr(response)}\n")
-            except (serial.SerialException, IOError, RuntimeError, OSError) as err:
-                if cmd.strip().lower() not in ["rb"]:  # Ignore error on reboot (RB) command
-                    logger.error('Failed after command: {0}'.format(cmd))
-                    logger.info("Error context:", exc_info=err)
+                    error_msg = 'DrawCore Serial Timeout after command: {0}'.format(cmd)
+                raise ValueError(error_msg)
+        except (serial.SerialException, IOError, RuntimeError, OSError) as err:
+            if cmd.strip().lower() not in ["rb"]:  # Ignore error on reboot (RB) command
+                logger.error('Failed after command: {0}'.format(cmd))
+                logger.info("Error context:", exc_info=err)
 
 
 def min_version(port_name, version_string):
