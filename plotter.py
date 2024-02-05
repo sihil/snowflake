@@ -23,6 +23,7 @@ class Plotter:
         self.y = 0
         self.z = 0
         self._lock = threading.Lock()
+        self.sleep_count = 0
 
     @property
     def exclusive(self):
@@ -55,10 +56,12 @@ class Plotter:
     def home(self):
         # Home the plotter, this uses the micro-switches to find the top left corner
         drawcore_serial.command(self.serial_port, "$H\r")
+        self.reset_sleep()
 
     def centre(self):
         # Move to the centre of the plotter from the top left corner
         drawcore_serial.command(self.serial_port, "G1G91X147.463Y-210F5000\r\r")
+        self.reset_sleep()
 
     def set_origin(self):
         # Set the current position as the origin
@@ -74,16 +77,19 @@ class Plotter:
         drawcore_serial.command(self.serial_port, f"G1G90X{x:.3f}Y{y:.3f}F{feed_rate}\r")
         self.x = x
         self.y = y
+        self.reset_sleep()
 
     def pen_down(self):
         # Lower the pen
         drawcore_serial.command(self.serial_port, "G1G90Z5.0F5000\r")
         self.z = 5.0
+        self.reset_sleep()
 
     def pen_up(self):
         # Raise the pen
         drawcore_serial.command(self.serial_port, "G1G90Z0.5F5000\r")
         self.z = 0.5
+        self.reset_sleep()
 
     def is_pen_down(self) -> bool:
         return self.pen_state() == PenState.DOWN
@@ -93,6 +99,18 @@ class Plotter:
 
     def pen_state(self) -> PenState:
         return PenState.DOWN if self.z > 1.0 else PenState.UP
+
+    def reset_sleep(self):
+        self.sleep_count = 0
+
+    def check_sleep(self):
+        if self.sleep_count < 50:
+            self.sleep_count += 1
+        elif self.is_pen_up() and self.sleep_count == 50:
+            with self.exclusive:
+                self.sleep()
+            logger.info("Plotter sleeping")
+            self.sleep_count += 1
 
     def sleep(self):
         drawcore_serial.command(self.serial_port, "$SLP\r")

@@ -67,7 +67,6 @@ def home_and_origin():
 
 
 current_drawing = []
-sleep_count = 0
 
 order = 6
 mirror = True
@@ -143,15 +142,9 @@ try:
         # Apply a dead zone (e.g., 20 units) around the neutral position
         if distance < 20:
             feed_rate = 0
-            if sleep_count < 50:
-                sleep_count += 1
-            elif plotter.is_pen_up() and sleep_count == 50:
-                with plotter.exclusive:
-                    plotter.sleep()
-                logger.info("Plotter sleeping")
-                sleep_count += 1
+            plotter.check_sleep()
+
         else:
-            sleep_count = 0
             # Map joystick values to speed
             feed_rate = map_distance_to_feedrate(distance, max_distance, max_feedrate)
 
