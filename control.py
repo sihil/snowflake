@@ -57,10 +57,13 @@ plotter.initialise()
 
 
 def home_and_origin():
-    logger.info("Homing and setting origin")
-    plotter.home()
-    plotter.centre()
-    plotter.set_origin()
+    def _do():
+        logger.info("Homing and setting origin")
+        plotter.home()
+        plotter.centre()
+        plotter.set_origin()
+
+    plotter.execute_if_idle(_do)
 
 
 current_drawing = []
@@ -91,9 +94,12 @@ def change_mirror(new_mirror: bool):
 
 
 def move_to_origin():
-    logger.info("Moving to origin")
-    if plotter.is_pen_up() and not plotter.is_at_origin():
-        plotter.move_to(0, 0, 8000)
+    def _do():
+        logger.info("Moving to origin")
+        if not plotter.is_at_origin():
+            plotter.move_to(0, 0, 8000)
+
+    plotter.execute_if_idle(_do)
 
 
 # register all the behaviour modifications
@@ -102,8 +108,8 @@ joystick.register_button_callback(button="ABS_HAT0Y", value=1, callback=lambda: 
 joystick.register_button_callback(button="ABS_HAT0X", value=-1, callback=lambda: change_mirror(False))
 joystick.register_button_callback(button="ABS_HAT0X", value=1, callback=lambda: change_mirror(True))
 
-joystick.register_button_callback(button="BTN_BASE5", value=1, callback=lambda: move_to_origin())
-joystick.register_button_callback(button="BTN_BASE6", value=1, callback=lambda: home_and_origin())
+joystick.register_button_callback(button="BTN_BASE5", value=1, callback=move_to_origin)
+joystick.register_button_callback(button="BTN_BASE6", value=1, callback=home_and_origin)
 
 try:
     while True:
@@ -121,16 +127,18 @@ try:
 
         # Set the pen state
         if joystick_z > 140 and plotter.is_pen_up():
-            plotter.pen_down()
-            current_drawing.append((plotter.x, plotter.y))
+            with plotter.exclusive:
+                plotter.pen_down()
+                current_drawing.append((plotter.x, plotter.y))
         elif joystick_z <= 128 and plotter.is_pen_down():
-            plotter.pen_up()
-            draw_snowflake(plotter=plotter,
-                           drawing=current_drawing,
-                           order=order,
-                           mirror=mirror,
-                           return_to=(plotter.x, plotter.y))
-            current_drawing = []
+            with plotter.exclusive:
+                plotter.pen_up()
+                draw_snowflake(plotter=plotter,
+                               drawing=current_drawing,
+                               order=order,
+                               mirror=mirror,
+                               return_to=(plotter.x, plotter.y))
+                current_drawing = []
 
         # Apply a dead zone (e.g., 20 units) around the neutral position
         if distance < 20:
@@ -138,7 +146,8 @@ try:
             if sleep_count < 50:
                 sleep_count += 1
             elif plotter.is_pen_up() and sleep_count == 50:
-                plotter.sleep()
+                with plotter.exclusive:
+                    plotter.sleep()
                 logger.info("Plotter sleeping")
                 sleep_count += 1
         else:
@@ -147,7 +156,9 @@ try:
             feed_rate = map_distance_to_feedrate(distance, max_distance, max_feedrate)
 
             # Calculate the components of the movement
-            x_portion_of_distance, y_portion_of_distance = calculate_components(joystick_y, joystick_x, feed_rate * (1/600))
+            x_portion_of_distance, y_portion_of_distance = calculate_components(
+                joystick_y, joystick_x, feed_rate * (1/600)
+            )
 
             # Calculate where we want the head to move to in a tenth of a second (or a 600th of a minute)
             target_x = plotter.x + x_portion_of_distance
@@ -158,7 +169,8 @@ try:
 
             # Move the head to the target location if it's safe to do so
             if distance_from_origin <= 148:
-                plotter.move_to(x=target_x, y=target_y, feed_rate=feed_rate)
+                with plotter.exclusive:
+                    plotter.move_to(x=target_x, y=target_y, feed_rate=feed_rate)
                 # add the current location to the drawing if we're drawing
                 if plotter.is_pen_down():
                     current_drawing.append((plotter.x, plotter.y))

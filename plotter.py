@@ -1,4 +1,5 @@
 import logging
+import threading
 from enum import Enum
 
 import drawcore_serial
@@ -21,6 +22,24 @@ class Plotter:
         self.x = 0
         self.y = 0
         self.z = 0
+        self._lock = threading.Lock()
+
+    @property
+    def exclusive(self):
+        """
+        A context manager that should be used to secure exclusive use of the plotter
+        """
+        return self._lock
+
+    def execute_if_idle(self, f):
+        """
+        Execute the given function if the plotter is idle (i.e. not locked exclusively using the above context manager)
+        """
+        if self._lock.acquire(blocking=False):
+            try:
+                f()
+            finally:
+                self._lock.release()
 
     def initialise(self):
         """
