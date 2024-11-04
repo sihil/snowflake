@@ -6,6 +6,7 @@ import time
 import joystick
 import plotter
 from drawing import draw_snowflake
+from ui import SnowflakeUI
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,12 @@ joystick_thread = threading.Thread(target=joystick.read_event_loop, args=(exit_e
 
 # Start the thread
 joystick_thread.start()
+
+# Initialize the UI
+root = tk.Tk()
+ui = SnowflakeUI(root)
+ui_thread = threading.Thread(target=ui.start_ui)
+ui_thread.start()
 
 
 def calculate_distance(x, y, max_distance):
@@ -75,6 +82,8 @@ mirror = True
 def log_state():
     mirror_state = "with mirroring" if mirror else "without mirroring"
     logger.info(f"Order {order} {mirror_state}")
+    ui.update_order(order)
+    ui.update_mirroring(mirror)
 
 
 def change_order(delta):
