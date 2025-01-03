@@ -5,6 +5,7 @@ import time
 
 import joystick
 import plotter
+from plotter import MAX_FEED_RATE_PEN_DOWN_MM_MIN
 from drawing import draw_snowflake
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,6 @@ def map_distance_to_feedrate(distance, max_distance, max_feedrate):
     return int(feedrate)  # Convert to an integer if needed
 
 
-max_feedrate = 2000  # note that this is mm/min
 max_distance = 512  # this is the maximum distance from the center of the joystick
 
 
@@ -146,7 +146,7 @@ try:
 
         else:
             # Map joystick values to speed
-            feed_rate = map_distance_to_feedrate(distance, max_distance, max_feedrate)
+            feed_rate = map_distance_to_feedrate(distance, max_distance, MAX_FEED_RATE_PEN_DOWN_MM_MIN)
 
             # Calculate the components of the movement
             x_portion_of_distance, y_portion_of_distance = calculate_components(

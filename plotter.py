@@ -7,6 +7,10 @@ import drawcore_serial
 logger = logging.getLogger(__name__)
 
 
+MAX_FEED_RATE_PEN_UP_MM_MIN = 8000
+MAX_FEED_RATE_PEN_DOWN_MM_MIN = 2000
+
+
 class PenState(Enum):
     UP = 0
     DOWN = 1

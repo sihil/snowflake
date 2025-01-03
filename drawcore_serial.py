@@ -2,8 +2,7 @@
 # drawcore_serial.py
 # Serial connection utilities for DrawCore
 
-
-from distutils.version import LooseVersion
+from packaging.version import parse
 import logging
 import time
 import serial
@@ -228,7 +227,7 @@ def min_version(port_name, version_string):
             return None  # We haven't received a reasonable version number response.
 
         drawcore_version_string = drawcore_version_string.strip()  # Stripped copy, for number comparisons
-        if LooseVersion(drawcore_version_string) >= LooseVersion(version_string):
+        if parse(drawcore_version_string) >= parse(version_string):
             return True
         else:
             return False
