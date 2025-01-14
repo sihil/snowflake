@@ -23,11 +23,11 @@ class Joystick:
         
         # the rest state for my joystick
         self._joystick_state = {
-            "ABS_X": 512,  # main stick left/right (left = 0, centre = 512, right = 1023)
-            "ABS_Y": 512,  # main stick up/down (top = 0, centre = 512, bottom = 1023)
-            "ABS_Z": 128,  # throttle lever (forwards = 0, rest = 128, back = 255)
-            "ABS_RZ": 128,  # main stick rotate (anti-clockwise = 0, rest = 128, clockwise = 255)
-            "ABS_THROTTLE": 128,  # left/right button behind ABS_Z lever (left = 0, rest = 128, right = 255)
+            "ABS_X": 0.0,  # main stick left/right (left = -1.0, centre = 0.0, right = 1.0)
+            "ABS_Y": 0.0,  # main stick up/down (top = -1.0, centre = 0.0, bottom = 1.0)
+            "ABS_Z": 0.0,  # throttle lever (forwards = -1.0, rest = 0.0, back = 1.0)
+            "ABS_RZ": 0.0,  # main stick rotate (anti-clockwise = -1.0, rest = 0.0, clockwise = 1.0)
+            "ABS_THROTTLE": 0.0,  # left/right button behind ABS_Z lever (left = -1.0, rest = 0.0, right = 1.0)
             "BTN_TRIGGER": 0,  # 1 main trigger
             "BTN_THUMB": 0,  # 2 thumb button
             "BTN_THUMB2": 0,  # 3 right hand button
@@ -51,10 +51,6 @@ class Joystick:
         with self.lock:
             return copy.deepcopy(self._joystick_state)
 
-    def _map_axis_to_range(self, value, old_min=-1.0, old_max=1.0, new_min=0, new_max=1023):
-        """Map pygame's -1.0 to 1.0 range to our desired range"""
-        return int((value - old_min) * (new_max - new_min) / (old_max - old_min) + new_min)
-
     def check_events(self):
         """Non-blocking event check"""
         for event in pygame.event.get():
@@ -63,20 +59,15 @@ class Joystick:
             with self.lock:
                 if event.type == pygame.JOYAXISMOTION:
                     if event.axis == 0:  # X axis
-                        value = self._map_axis_to_range(event.value, new_min=0, new_max=1023)
-                        self._joystick_state["ABS_X"] = value
+                        self._joystick_state["ABS_X"] = event.value
                     elif event.axis == 1:  # Y axis
-                        value = self._map_axis_to_range(event.value, new_min=0, new_max=1023)
-                        self._joystick_state["ABS_Y"] = value
+                        self._joystick_state["ABS_Y"] = event.value
                     elif event.axis == 2:  # Throttle (Z)
-                        value = self._map_axis_to_range(event.value, new_min=0, new_max=255)
-                        self._joystick_state["ABS_Z"] = value
+                        self._joystick_state["ABS_Z"] = event.value
                     elif event.axis == 3:  # Rotation (RZ)
-                        value = self._map_axis_to_range(event.value, new_min=0, new_max=255)
-                        self._joystick_state["ABS_RZ"] = value
+                        self._joystick_state["ABS_RZ"] = event.value
                     elif event.axis == 4:  # Throttle lever
-                        value = self._map_axis_to_range(event.value, new_min=0, new_max=255)
-                        self._joystick_state["ABS_THROTTLE"] = value
+                        self._joystick_state["ABS_THROTTLE"] = event.value
                 
                 elif event.type == pygame.JOYHATMOTION:
                     if event.hat == 0:  # Assuming first (and only) hat
