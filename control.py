@@ -101,55 +101,68 @@ def main():
         joystick_instance.register_button_callback(button="BTN_BASE5", value=1, callback=move_to_origin)
         joystick_instance.register_button_callback(button="BTN_BASE6", value=1, callback=home_and_origin)
 
+        last_joystick_state = None
+        last_movement_time = time.time()
+
         # Main control loop
         while not exit_event.is_set():
             joystick_state = joystick_instance.latest_state()
+            
+            # Only process movement if the state has changed or we haven't moved in a while
+            current_time = time.time()
+            if (last_joystick_state is None or 
+                joystick_state != last_joystick_state or 
+                current_time - last_movement_time > 0.1):  # Check at least every 100ms
+                
+                # Read joystick input
+                joystick_x = joystick_state["ABS_X"]
+                joystick_y = joystick_state["ABS_Y"]
+                joystick_z = joystick_state["ABS_Z"]
 
-            # Read joystick input
-            joystick_x = joystick_state["ABS_X"]
-            joystick_y = joystick_state["ABS_Y"]
-            joystick_z = joystick_state["ABS_Z"]
+                # Calculate distance from neutral position
+                distance = calculate_distance(joystick_y, joystick_x, max_distance=512)
+                component_x, component_y = joystick_y - 512, joystick_x - 512
 
-            # Calculate distance from neutral position
-            distance = calculate_distance(joystick_y, joystick_x, max_distance=512)
-            component_x, component_y = joystick_y - 512, joystick_x - 512
-
-            # Handle pen state
-            if joystick_z > 140 and plotter_instance.is_pen_up():
-                with plotter_instance.exclusive:
-                    plotter_instance.pen_down()
-                    current_drawing.append((plotter_instance.x, plotter_instance.y))
-            elif joystick_z <= 128 and plotter_instance.is_pen_down():
-                with plotter_instance.exclusive:
-                    plotter_instance.pen_up()
-                    draw_snowflake(plotter=plotter_instance,
-                                 drawing=current_drawing,
-                                 order=order,
-                                 mirror=mirror,
-                                 return_to=(plotter_instance.x, plotter_instance.y))
-                    current_drawing = []
-
-            # Handle movement
-            if distance < 20:
-                feed_rate = 0
-                plotter_instance.check_sleep()
-            else:
-                feed_rate = map_distance_to_feedrate(distance, max_distance, MAX_FEED_RATE_PEN_DOWN_MM_MIN)
-                x_portion_of_distance, y_portion_of_distance = calculate_components(
-                    joystick_y, joystick_x, feed_rate * (1/600)
-                )
-
-                target_x = plotter_instance.x + x_portion_of_distance
-                target_y = plotter_instance.y + y_portion_of_distance
-                distance_from_origin = math.sqrt(target_x ** 2 + target_y ** 2)
-
-                if distance_from_origin <= 148:
+                # Handle pen state
+                if joystick_z > 140 and plotter_instance.is_pen_up():
                     with plotter_instance.exclusive:
-                        plotter_instance.move_to(x=target_x, y=target_y, feed_rate=feed_rate)
-                    if plotter_instance.is_pen_down():
+                        plotter_instance.pen_down()
                         current_drawing.append((plotter_instance.x, plotter_instance.y))
+                elif joystick_z <= 128 and plotter_instance.is_pen_down():
+                    with plotter_instance.exclusive:
+                        plotter_instance.pen_up()
+                        draw_snowflake(plotter=plotter_instance,
+                                    drawing=current_drawing,
+                                    order=order,
+                                    mirror=mirror,
+                                    return_to=(plotter_instance.x, plotter_instance.y))
+                        current_drawing = []
+
+                # Handle movement
+                if distance < 20:
+                    feed_rate = 0
+                    plotter_instance.check_sleep()
+                else:
+                    feed_rate = map_distance_to_feedrate(distance, max_distance, MAX_FEED_RATE_PEN_DOWN_MM_MIN)
+                    x_portion_of_distance, y_portion_of_distance = calculate_components(
+                        joystick_y, joystick_x, feed_rate * (1/600)  # compute movement for 1/10th of a second (this must match the sleep time below)
+                    )
+
+                    target_x = plotter_instance.x + x_portion_of_distance
+                    target_y = plotter_instance.y + y_portion_of_distance
+                    distance_from_origin = math.sqrt(target_x ** 2 + target_y ** 2)
+
+                    if distance_from_origin <= 148:
+                        with plotter_instance.exclusive:
+                            plotter_instance.move_to(x=target_x, y=target_y, feed_rate=feed_rate)
+                        if plotter_instance.is_pen_down():
+                            current_drawing.append((plotter_instance.x, plotter_instance.y))
+                
+                last_joystick_state = joystick_state.copy()
+                last_movement_time = current_time
 
             try:
+                # sleep for a tenth of a second
                 time.sleep(0.1)
             except InterruptedError:
                 break

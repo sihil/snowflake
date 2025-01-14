@@ -1,4 +1,4 @@
-inputs==0.5
+pygame==2.5.2
 pyserial==3.5
 packaging==24.2
 ruff==0.8.5
