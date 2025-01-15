@@ -16,8 +16,11 @@ TODO
 ----
 
 Some ideas for further improvements:
- - [ ] Narrow the circular area so there is a bigger margin around the edge of the plot area, that will make it more 
+ - [x] Narrow the circular area so there is a bigger margin around the edge of the plot area, that will make it more 
        asthetically pleasing.
+ - [ ] At the moment there is a pause between drawing each segment whilst we calculate the next segment. This should be
+       resolved somehow, possibly by sleeping for a little less time and pre-calculating the next segment so that
+       we send the command before the pen has finished moving on the previous segment.
  - [ ] Add a way to draw the border of the plot area so that the pattern is contained within it. This will be 
        asthetically pleasing and also make it easier for the user to know where the plot area is (it's impossible to
        draw outside the circular area as otherwise it cannot always be rotated).
@@ -32,5 +35,7 @@ Some ideas for further improvements:
    - [ ] The movement is automatically smoothed so that you can't do angular movements. This would make it easier to
          draw smooth curves and would make it easier to draw patterns that are more likely to be flower like.
  - [ ] Write some unit tests. This will make it a lot easier as it becomes more complicated
- - [ ] Figure out why the ctrl-c doesn't work to stop the program. The threads are not being stopped properly so you
+ - [x] Figure out why the ctrl-c doesn't work to stop the program. The threads are not being stopped properly so you
        currently have to press ctrl-c three times. 
+ - [x] Query the plotter's configuration to get the width and height of the plotter. This will make it easier to 
+       calculate the maximum radius for drawing.
