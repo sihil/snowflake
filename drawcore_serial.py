@@ -159,28 +159,40 @@ def timestamp():
 
 def query(port_name, cmd):
     if port_name is not None and cmd is not None:
-        response = ''
+        response_lines = []
         try:
             port_name.write(cmd.encode('ascii'))
-            response = port_name.readline().decode('ascii')
-            n_retry_count = 0
-            while len(response) == 0 and n_retry_count < 20:
-                # get new response to replace null response if necessary
-                response = port_name.readline()
-                n_retry_count += 1
-            if cmd.split(",")[0].strip().lower() not in ["v", "i", "a", "mr", "pi", "qm"]:
-                # Most queries return an "OK" after the data requested.
-                # We skip this for those few queries that do not return an extra line.
-                unused_response = port_name.readline()  # read in extra blank/OK line
+            
+            # Keep reading lines until we get an 'ok' or timeout
+            while True:
+                line = port_name.readline().decode('ascii').strip()
                 n_retry_count = 0
-                while len(unused_response) == 0 and n_retry_count < 20:
-                    # get new response to replace null response if necessary
-                    unused_response = port_name.readline()
+                
+                # Handle empty responses with retry
+                while len(line) == 0 and n_retry_count < 20:
+                    line = port_name.readline().decode('ascii').strip()
                     n_retry_count += 1
+                
+                # Special case for commands that don't return 'ok'
+                if cmd.split(",")[0].strip().lower() in ["v", "i", "a", "mr", "pi", "qm"]:
+                    return line if line else ''
+
+                # If we got a response
+                if line:
+                    if line.strip().startswith("ok"):
+                        break
+                    response_lines.append(line)
+                else:
+                    # No response after retries
+                    break
+            
+            # Return all lines joined with newlines
+            return '\n'.join(response_lines) if response_lines else ''
+            
         except (serial.SerialException, IOError, RuntimeError, OSError) as err:
             logger.error("Error reading serial data")
             logger.info("Error context:", exc_info=err)
-        return response
+            return ''
 
 
 def command(port_name, cmd):

@@ -28,6 +28,8 @@ class Plotter:
         self.z = 0
         self._lock = threading.Lock()
         self.sleep_count = 0
+        self.width_mm = None
+        self.height_mm = None
 
     @property
     def exclusive(self):
@@ -46,6 +48,27 @@ class Plotter:
             finally:
                 self._lock.release()
 
+    def query_configuration(self):
+        """Query the plotter's configuration including device dimensions"""
+        # Query the device settings
+        response = drawcore_serial.query(self.serial_port, "$$\r")  # Get all settings
+
+        # Parse the response to get width and height
+        settings = {}
+        for line in response.split('\n'):
+            if '=' in line:
+                setting_num, value = line.split('=')
+                settings[setting_num] = float(value.strip())
+
+        # Get width and height from settings $130 and $131
+        if '$130' in settings:
+            self.width_mm = settings['$130']
+            logger.info(f"Device width: {self.width_mm}mm")
+
+        if '$131' in settings:
+            self.height_mm = settings['$131'] 
+            logger.info(f"Device height: {self.height_mm}mm")
+
     def initialise(self):
         """
         Initialise the plotter.
@@ -55,7 +78,10 @@ class Plotter:
         if self.serial_port is None:
             raise Exception("Failed to find plotter.")
         version = drawcore_serial.query_version(self.serial_port)
-        logger.info(f"Connected to DrawCore version {version}")
+        logger.info(f"Connected to DrawCore version {version} on {self.serial_port.name}")
+        
+        # Query the device configuration
+        self.query_configuration()
 
     def home(self):
         # Home the plotter, this uses the micro-switches to find the top left corner
@@ -64,7 +90,14 @@ class Plotter:
 
     def centre(self):
         # Move to the centre of the plotter from the top left corner
-        drawcore_serial.command(self.serial_port, "G1G91X147.463Y-210F5000\r\r")
+        if self.width_mm is not None and self.height_mm is not None:
+            # Use the actual device dimensions
+            x_centre = self.width_mm / 2
+            y_centre = -self.height_mm / 2  # Negative because Y is inverted
+            drawcore_serial.command(self.serial_port, f"G1G91X{x_centre:.3f}Y{y_centre:.3f}F5000\r\r")
+        else:
+            # Fallback to hardcoded values
+            drawcore_serial.command(self.serial_port, "G1G91X147.463Y-210F5000\r\r")
         self.reset_sleep()
 
     def set_origin(self):

@@ -17,6 +17,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s [%(levelnam
 # Time to sleep between iterations (in seconds)
 LOOP_SLEEP_TIME = 0.1  # 100ms
 
+# Safety margin from the edge of the plotter's working area (in mm)
+MARGIN_MM = 30.0
+
 def calculate_distance(x, y):
     """Calculate distance from center (0,0) with pygame coordinates"""
     return math.sqrt(x * x + y * y)  # Returns value 0.0 to 1.0 for unit circle
@@ -37,6 +40,19 @@ def calculate_components(x, y, distance):
 def map_distance_to_feedrate(distance, max_feedrate):
     """Map joystick distance (0.0 to 1.0) to feedrate"""
     return int(distance * max_feedrate)
+
+def calculate_max_radius(plotter_instance):
+    """Calculate the maximum safe drawing radius based on plotter dimensions"""
+    if plotter_instance.width_mm is not None and plotter_instance.height_mm is not None:
+        # Use the actual device dimensions, accounting for the fact we're drawing from the center
+        max_radius = min(plotter_instance.width_mm / 2, plotter_instance.height_mm / 2) - MARGIN_MM
+        logger.info(f"Using device dimensions for max radius with margin of {MARGIN_MM}mm: {max_radius}mm")
+        return max_radius
+    else:
+        # Fallback to hardcoded value
+        fallback_radius = 120.0
+        logger.warning(f"No device dimensions available, using fallback radius: {fallback_radius}mm")
+        return fallback_radius
 
 def main():
     # Create an event to signal the thread to exit
@@ -65,8 +81,8 @@ def main():
         current_drawing = []
         order = 6
         mirror = True
-        dead_zone = 0.04  # 4% of full range for dead zone (was 20/512 ≈ 0.04)
-        max_radius = 120.0  # Maximum radius in mm from origin that we allow drawing
+        dead_zone = 0.04  # 4% of full range for dead zone
+        max_radius = calculate_max_radius(plotter_instance)
 
         def home_and_origin():
             def _do():
@@ -107,7 +123,6 @@ def main():
         joystick_instance.register_button_callback(button="ABS_HAT0X", value=1, callback=lambda: change_mirror(True))
         joystick_instance.register_button_callback(button="BTN_BASE5", value=1, callback=move_to_origin)
         joystick_instance.register_button_callback(button="BTN_BASE6", value=1, callback=home_and_origin)
-
 
         # Main control loop
         while not exit_event.is_set():
